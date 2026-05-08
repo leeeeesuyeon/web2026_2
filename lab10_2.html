@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>북마크 매니저</title>
+
+  <style>
+  body {
+    font-family: sans-serif;
+    padding: 2rem;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .form input {
+    flex: 1;
+    padding: 0.5rem;
+  }
+
+  #searchInput {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem;
+    margin-bottom: 1.5rem;
+  }
+
+  button {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
+
+  .category-title {
+    margin-top: 1.2rem;
+    margin-bottom: 0.2rem;
+    font-weight: bold;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin-top: 0.2rem;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+  }
+
+  li.dragging {
+    opacity: 0.4;
+  }
+
+  .name {
+    flex: 1;
+    cursor: pointer;
+    color: #0066cc;
+  }
+
+  .name:hover {
+    text-decoration: underline;
+  }
+
+  .url {
+    color: #888;
+    font-size: 0.85rem;
+  }
+
+  .star {
+    cursor: pointer;
+    user-select: none;
+    color: #ccc;
+    font-size: 1.2rem;
+  }
+
+  .star.active {
+    color: gold;
+  }
+
+  .delete-btn {
+    background: #ff5252;
+    color: white;
+    border: none;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+  }
+
+  .empty {
+    color: #777;
+    margin-top: 1rem;
+  }
+  </style>
+</head>
+
+<body>
+  <h1>나의 북마크</h1>
+
+  <!--#북마크 정보를 입력하는 부분-->
+  <div class="form">
+    <input type="text" id="nameInput" placeholder="사이트 이름">
+    <input type="text" id="urlInput" placeholder="https://...">
+    <input type="text" id="categoryInput" placeholder="카테고리">
+    <button id="addBtn">추가</button>
+  </div>
+
+  <!--#이름이나 주소로 북마크를 검색하는 부분-->
+  <input type="text" id="searchInput" placeholder="검색 (이름 또는 URL)">
+
+  <!--#추가한 북마크가 화면에 표시되는 부분-->
+  <div id="bookmarkArea"></div>
+
+  <script>
+  //#입력창과 버튼, 북마크 표시 영역을 가져옴
+  const nameInput = document.querySelector('#nameInput');
+  const urlInput = document.querySelector('#urlInput');
+  const categoryInput = document.querySelector('#categoryInput');
+  const searchInput = document.querySelector('#searchInput');
+  const addBtn = document.querySelector('#addBtn');
+  const bookmarkArea = document.querySelector('#bookmarkArea');
+
+  //#북마크 목록을 저장할 배열
+  let bookmarks = [];
+  let dragId = null;
+
+  //#북마크 목록을 브라우저 저장소에 저장함
+  function saveBookmarks() {
+    localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+  }
+
+  //#저장되어 있던 북마크 목록을 다시 불러옴
+  function loadBookmarks() {
+    const saved = localStorage.getItem('bookmarks');
+
+    if (saved !== null) {
+      bookmarks = JSON.parse(saved);
+
+      //#카테고리가 없는 예전 데이터는 미분류로 처리함
+      for (let i = 0; i < bookmarks.length; i++) {
+        if (bookmarks[i].category === undefined) {
+          bookmarks[i].category = '미분류';
+        }
+      }
+    }
+  }
+
+  //#URL 앞에 http가 없으면 자동으로 https를 붙임
+  function fixUrl(url) {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    return 'https://' + url;
+  }
+
+  //#id가 같은 북마크를 찾아서 반환함
+  function findBookmark(id) {
+    for (let i = 0; i < bookmarks.length; i++) {
+      if (bookmarks[i].id === id) {
+        return bookmarks[i];
+      }
+    }
+
+    return null;
+  }
+
+  //#검색어에 맞는 북마크만 골라서 보여줌
+  function getFilteredList() {
+    const keyword = searchInput.value.trim().toLowerCase();
+    const result = [];
+
+    for (let i = 0; i < bookmarks.length; i++) {
+      const b = bookmarks[i];
+      const name = b.name.toLowerCase();
+      const url = b.url.toLowerCase();
+
+      if (keyword === '' || name.includes(keyword) || url.includes(keyword)) {
+        result.push(b);
+      }
+    }
+
+    //#즐겨찾기한 북마크가 먼저 보이게 정렬함
+    result.sort(function (a, b) {
+      return b.starred - a.starred;
+    });
+
+    return result;
+  }
+
+  //#북마크 목록을 화면에 다시 그리는 함수
+  function render() {
+    bookmarkArea.innerHTML = '';
+
+    const showList = getFilteredList();
+
+    if (showList.length === 0) {
+      bookmarkArea.innerHTML = '<p class="empty">표시할 북마크가 없습니다.</p>';
+      return;
+    }
+
+    const categories = [];
+
+    //#화면에 표시할 카테고리 목록을 만듦
+    for (let i = 0; i < showList.length; i++) {
+      const category = showList[i].category;
+
+      if (!categories.includes(category)) {
+        categories.push(category);
+      }
+    }
+
+    //#카테고리별로 북마크를 나누어 보여줌
+    for (let i = 0; i < categories.length; i++) {
+      const category = categories[i];
+      const title = document.createElement('div');
+      const ul = document.createElement('ul');
+
+      title.className = 'category-title';
+      title.textContent = '📁 ' + category;
+      bookmarkArea.appendChild(title);
+
+      for (let j = 0; j < showList.length; j++) {
+        const b = showList[j];
+
+        if (b.category === category) {
+          const li = document.createElement('li');
+          li.dataset.id = b.id;
+          li.draggable = true;
+
+          li.innerHTML = `
+            <span class="name">${b.name}</span>
+            <span class="url">${b.url}</span>
+            <span class="star ${b.starred ? 'active' : ''}">★</span>
+            <button class="delete-btn">삭제</button>
+          `;
+
+          ul.appendChild(li);
+        }
+      }
+
+      bookmarkArea.appendChild(ul);
+    }
+  }
+
+  //#추가 버튼을 눌렀을 때 새 북마크를 추가함
+  addBtn.addEventListener('click', function () {
+    const name = nameInput.value.trim();
+    let url = urlInput.value.trim();
+    let category = categoryInput.value.trim();
+
+    if (name === '' || url === '') {
+      alert('사이트 이름과 URL을 모두 입력하세요.');
+      return;
+    }
+
+    if (category === '') {
+      category = '미분류';
+    }
+
+    url = fixUrl(url);
+
+    const newBookmark = {
+      id: Date.now(),
+      name: name,
+      url: url,
+      starred: false,
+      category: category
+    };
+
+    bookmarks.push(newBookmark);
+    saveBookmarks();
+    render();
+
+    nameInput.value = '';
+    urlInput.value = '';
+    categoryInput.value = '';
+  });
+
+  //#검색창에 입력할 때마다 목록을 다시 보여줌
+  searchInput.addEventListener('input', function () {
+    render();
+  });
+
+  //#북마크 이름 클릭, 별표 클릭, 삭제 버튼을 한 곳에서 처리함
+  bookmarkArea.addEventListener('click', function (event) {
+    const li = event.target.closest('li');
+
+    if (li === null) {
+      return;
+    }
+
+    const id = Number(li.dataset.id);
+    const selected = findBookmark(id);
+
+    if (selected === null) {
+      return;
+    }
+
+    if (event.target.classList.contains('name')) {
+      window.open(selected.url, '_blank');
+    }
+
+    if (event.target.classList.contains('star')) {
+      selected.starred = !selected.starred;
+      saveBookmarks();
+      render();
+    }
+
+    if (event.target.classList.contains('delete-btn')) {
+      bookmarks = bookmarks.filter(function (b) {
+        return b.id !== id;
+      });
+
+      saveBookmarks();
+      render();
+    }
+  });
+
+  //#북마크를 드래그하기 시작할 때 실행됨
+  bookmarkArea.addEventListener('dragstart', function (event) {
+    const li = event.target.closest('li');
+
+    if (li !== null) {
+      dragId = Number(li.dataset.id);
+      li.classList.add('dragging');
+    }
+  });
+
+  //#드래그가 끝나면 표시 효과를 지움
+  bookmarkArea.addEventListener('dragend', function (event) {
+    const li = event.target.closest('li');
+
+    if (li !== null) {
+      li.classList.remove('dragging');
+    }
+  });
+
+  //#drop 이벤트가 실행되도록 기본 동작을 막음
+  bookmarkArea.addEventListener('dragover', function (event) {
+    event.preventDefault();
+  });
+
+  //#다른 북마크 위에 놓으면 순서를 바꿈
+  bookmarkArea.addEventListener('drop', function (event) {
+    event.preventDefault();
+
+    const li = event.target.closest('li');
+
+    if (li === null || dragId === null) {
+      return;
+    }
+
+    const dropId = Number(li.dataset.id);
+
+    if (dragId === dropId) {
+      return;
+    }
+
+    const dragItem = findBookmark(dragId);
+    const newList = [];
+
+    for (let i = 0; i < bookmarks.length; i++) {
+      if (bookmarks[i].id !== dragId) {
+        if (bookmarks[i].id === dropId) {
+          newList.push(dragItem);
+        }
+
+        newList.push(bookmarks[i]);
+      }
+    }
+
+    bookmarks = newList;
+    dragId = null;
+    saveBookmarks();
+    render();
+  });
+
+  //#페이지를 열 때 저장된 북마크를 불러오고 화면에 표시함
+  loadBookmarks();
+  render();
+  </script>
+</body>
+</html>

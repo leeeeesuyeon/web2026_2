@@ -1,124 +1,128 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
-    <meta charset="UTF-8">
-    <title>글자 수 카운터</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            padding: 2rem;
-            max-width: 600px;
-            margin: 0 auto;
-        }
+  <meta charset="UTF-8">
+  <title>글자 수 카운터</title>
+  <style>
+  body {
+    font-family: sans-serif;
+    padding: 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
 
-        textarea {
-            width: 100%;
-            min-height: 200px;
-            padding: 0.5rem;
-            font-size: 1rem;
-            box-sizing: border-box;
-        }
+  textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 0.5rem;
+    font-size: 1rem;
+    box-sizing: border-box;
+  }
 
-        .count {
-            color: #666;
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
+  .count {
+    color: #666;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+  }
 
-        .count.warning {
-            color: red;
-            font-weight: bold;
-        }
+  .count.warning {
+    color: red;
+    font-weight: bold;
+  }
 
-        button {
-            margin-top: 1rem;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-        }
+  button {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+  }
 
-        #saveText {
-            margin-left: 0.5rem;
-            color: #777;
-            font-size: 0.85rem;
-        }
-    </style>
+  #saveText {
+    margin-left: 0.5rem;
+    color: #777;
+    font-size: 0.85rem;
+  }
+  </style>
 </head>
 
 <body>
-    <h1>나의 메모</h1>
-    <textarea id="memoText" placeholder="여기에 글을 쓰세요..."></textarea>
+  <h1>나의 메모</h1>
 
-    <div class="count" id="countBox">
-        글자: <span id="charCount">0</span> · 단어: <span id="wordCount">0</span>
-        <span id="saveText"></span>
-    </div>
+  <!--#메모를 입력하는 부분-->
+  <textarea id="memoText" placeholder="여기에 글을 쓰세요..."></textarea>
 
-    <button id="clearBtn">지우기</button>
+  <!--#글자 수, 단어 수, 저장 상태를 보여주는 부분-->
+  <div class="count" id="countBox">
+    글자: <span id="charCount">0</span> · 단어: <span id="wordCount">0</span>
+    <span id="saveText"></span>
+  </div>
 
-    <script>
-        const textarea = document.querySelector('#memoText');
-        const charEl = document.querySelector('#charCount');
-        const wordEl = document.querySelector('#wordCount');
-        const countBox = document.querySelector('#countBox');
-        const clearBtn = document.querySelector('#clearBtn');
-        const saveText = document.querySelector('#saveText');
+  <button id="clearBtn">지우기</button>
 
+  <script>
+  //#필요한 요소들을 가져옴
+  const textarea = document.querySelector('#memoText');
+  const charEl = document.querySelector('#charCount');
+  const wordEl = document.querySelector('#wordCount');
+  const countBox = document.querySelector('#countBox');
+  const clearBtn = document.querySelector('#clearBtn');
+  const saveText = document.querySelector('#saveText');
 
-        let saveTimer;
+  let saveTimer;
 
-        function updateCount() {
-            const text = textarea.value;
+  //#글자 수와 단어 수를 계산하는 함수
+  function updateCount() {
+    const text = textarea.value;
 
-            charEl.textContent = text.length;
+    charEl.textContent = text.length;
 
-            if (text.trim() === '') {
-                wordEl.textContent = 0;
-            } else {
-                wordEl.textContent = text.trim().split(/\s+/).length;
-            }
+    if (text.trim() === '') {
+      wordEl.textContent = 0;
+    } else {
+      wordEl.textContent = text.trim().split(/\s+/).length;
+    }
 
-           
-            if (text.length >= 200) {
-                countBox.classList.add('warning');
-            } else {
-                countBox.classList.remove('warning');
-            }
-        }
+    //#200자 이상이면 글자 색을 빨간색으로 바꿈
+    if (text.length >= 200) {
+      countBox.classList.add('warning');
+    } else {
+      countBox.classList.remove('warning');
+    }
+  }
 
+  //#메모 내용을 브라우저에 저장하는 함수
+  function saveMemo() {
+    localStorage.setItem('memo', textarea.value);
+    saveText.textContent = '저장됨';
+  }
 
-        function saveMemo() {
-            localStorage.setItem('memo', textarea.value);
-            saveText.textContent = '저장됨';
-        }
+  //#전에 저장된 메모가 있으면 다시 불러옴
+  const savedMemo = localStorage.getItem('memo');
 
-        const savedMemo = localStorage.getItem('memo');
+  if (savedMemo !== null) {
+    textarea.value = savedMemo;
+  }
 
-        if (savedMemo !== null) {
-            textarea.value = savedMemo;
-        }
+  updateCount();
 
-        updateCount();
+  //#글을 입력할 때마다 글자 수를 바꾸고 자동 저장함
+  textarea.addEventListener('input', function () {
+    updateCount();
+    saveText.textContent = '입력 중...';
 
-      
-        textarea.addEventListener('input', function () {
-            updateCount();
-            saveText.textContent = '입력 중...';
+    clearTimeout(saveTimer);
 
-            clearTimeout(saveTimer);
-            saveTimer = setTimeout(function () {
-                saveMemo();
-            }, 500);
-        });
+    saveTimer = setTimeout(function () {
+      saveMemo();
+    }, 500);
+  });
 
-     
-        clearBtn.addEventListener('click', function () {
-            textarea.value = '';
-            localStorage.removeItem('memo');
-            saveText.textContent = '삭제됨';
-            updateCount();
-        });
-    </script>
+  //#지우기 버튼을 누르면 입력 내용과 저장된 내용을 삭제함
+  clearBtn.addEventListener('click', function () {
+    textarea.value = '';
+    localStorage.removeItem('memo');
+    saveText.textContent = '삭제됨';
+    updateCount();
+  });
+  </script>
 </body>
-
 </html>
