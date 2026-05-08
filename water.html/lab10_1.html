@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>글자 수 카운터</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 0.5rem;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        .count {
+            color: #666;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .count.warning {
+            color: red;
+            font-weight: bold;
+        }
+
+        button {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+        }
+
+        #saveText {
+            margin-left: 0.5rem;
+            color: #777;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>나의 메모</h1>
+    <textarea id="memoText" placeholder="여기에 글을 쓰세요..."></textarea>
+
+    <div class="count" id="countBox">
+        글자: <span id="charCount">0</span> · 단어: <span id="wordCount">0</span>
+        <span id="saveText"></span>
+    </div>
+
+    <button id="clearBtn">지우기</button>
+
+    <script>
+        const textarea = document.querySelector('#memoText');
+        const charEl = document.querySelector('#charCount');
+        const wordEl = document.querySelector('#wordCount');
+        const countBox = document.querySelector('#countBox');
+        const clearBtn = document.querySelector('#clearBtn');
+        const saveText = document.querySelector('#saveText');
+
+
+        let saveTimer;
+
+        function updateCount() {
+            const text = textarea.value;
+
+            charEl.textContent = text.length;
+
+            if (text.trim() === '') {
+                wordEl.textContent = 0;
+            } else {
+                wordEl.textContent = text.trim().split(/\s+/).length;
+            }
+
+           
+            if (text.length >= 200) {
+                countBox.classList.add('warning');
+            } else {
+                countBox.classList.remove('warning');
+            }
+        }
+
+
+        function saveMemo() {
+            localStorage.setItem('memo', textarea.value);
+            saveText.textContent = '저장됨';
+        }
+
+        const savedMemo = localStorage.getItem('memo');
+
+        if (savedMemo !== null) {
+            textarea.value = savedMemo;
+        }
+
+        updateCount();
+
+      
+        textarea.addEventListener('input', function () {
+            updateCount();
+            saveText.textContent = '입력 중...';
+
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(function () {
+                saveMemo();
+            }, 500);
+        });
+
+     
+        clearBtn.addEventListener('click', function () {
+            textarea.value = '';
+            localStorage.removeItem('memo');
+            saveText.textContent = '삭제됨';
+            updateCount();
+        });
+    </script>
+</body>
+
+</html>
